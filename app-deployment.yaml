@@ -1,0 +1,109 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: test-app-resources
+  labels:
+    app: test-app-resources
+spec:
+  replicas: 4
+  selector:
+    matchLabels:
+      app: test-app-resources
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+  template:
+    metadata:
+      labels:
+        app: test-app-resources
+      affinity:
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+              nodeSelectorTerms:
+              - matchExpressions:
+                - key: kubernetes.io/os # here we can pass regions like kubernetes.io/os: "us-east-1"
+                  operator: In
+                  values:
+                  - linux # regions likr -ec2-
+          preferredDuringSchedulingIgnoredDuringExecution:  # nodes with tag that have low cpu load, or we can choose node with ssd disk type 
+          - weight: 1
+            preference:
+              matchExpressions:
+              - key: type
+                operator: In
+                values:
+                - cpu
+      containers:
+      - name: test-app-resources
+        image: nginx:1.20
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "0.1"
+          limits:
+            memory: "128Mi"
+            cpu: "1"       
+        readinessProbe:
+          httpGet:
+            path: /health  
+            port: 80
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        livenessProbe:
+          httpGet: 
+            path: /health
+            port: 80
+          initialDelaySeconds: 5
+          periodSeconds: 10
+      restartPolicy: Always
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: test-app-resources-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: test-app-resources
+  minReplicas: 2
+  maxReplicas: 4
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 30 # any % of load
+# ---
+# apiVersion: autoscaling.k8s.io/v1
+# kind: VerticalPodAutoscaler
+# metadata:
+#   name: test-app-resources-vpa
+# spec:
+#   targetRef:
+#     apiVersion: "apps/v1"
+#     kind: Deployment
+#     name: test-app-resources
+#   updatePolicy:
+#     updateMode: "Auto"
+#   resourcePolicy:
+#     containerPolicies:
+#       - containerName: my-container
+#         mode: "Auto"
+#         minAllowed:
+#           cpu: "0.1"
+#           memory: 128Mi
+#         maxAllowed:
+#           cpu: "1"
+#           memory: 128Mi
+#  also can add somethig like this
+
+
+         
+
